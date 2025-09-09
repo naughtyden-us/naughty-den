@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import { Creator } from './types';
 
 interface CreatorCardProps {
@@ -11,7 +10,7 @@ interface CreatorCardProps {
 
 const CreatorCard: React.FC<CreatorCardProps> = ({ creator, onViewProfile }) => (
   <div className="relative overflow-hidden rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105">
-    <Image src={creator.image} alt={creator.name} width={400} height={400} className="w-full h-auto object-cover" />
+    <img src={creator.image} alt={creator.name} width={400} height={400} className="w-full h-auto object-cover" />
     <div className="absolute top-2 right-2 flex space-x-2">
       {creator.isAd && (
         <span className="text-xs font-semibold bg-pink-600 text-white px-2 py-1 rounded-full uppercase">Ad</span>
