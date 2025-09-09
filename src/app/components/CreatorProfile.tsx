@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Image from 'next/image';
 import { Creator } from './types';
 
 interface CreatorProfileProps {
@@ -14,16 +13,15 @@ const CreatorProfile: React.FC<CreatorProfileProps> = ({ creator, onClose }) => 
     <div className="fixed inset-0 bg-gray-950 text-white overflow-y-auto z-[100]">
       {/* Background Image and Header */}
       <div className="relative h-64 md:h-96">
-        <Image 
-          src={creator.image} 
-          alt={`${creator.name}'s banner`} 
-          layout="fill"
-          objectFit="cover"
+        <img
+          src={creator.image}
+          alt={`${creator.name}'s banner`}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           className="blur-sm brightness-50"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-transparent"></div>
-        <button 
-          onClick={onClose} 
+        <button
+          onClick={onClose}
           className="absolute top-4 right-4 p-2 rounded-full bg-gray-800 text-gray-400 hover:text-white transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -40,7 +38,7 @@ const CreatorProfile: React.FC<CreatorProfileProps> = ({ creator, onClose }) => 
             <div className="bg-gray-900 rounded-xl p-6 shadow-lg flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-pink-600">
-                  <Image src={creator.image} alt={creator.name} width={64} height={64} className="w-full h-full object-cover" />
+                  <img src={creator.image} alt={creator.name} width={64} height={64} className="w-full h-full object-cover" />
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
@@ -96,8 +94,8 @@ const CreatorProfile: React.FC<CreatorProfileProps> = ({ creator, onClose }) => 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {/* Dynamically render recent photos */}
                 {[...Array(4)].map((_, index) => (
-                  <div key={index} className="relative rounded-lg overflow-hidden">
-                    <Image src={creator.image} alt="Recent photo" width={200} height={200} className="w-full h-auto object-cover" />
+                  <div key={index} className="relative rounded-lg overflow-hidden cursor-pointer">
+                    <img src={creator.image} alt="Recent photo" width={200} height={200} className="w-full h-auto object-cover" />
                     <span className="absolute top-2 left-2 text-xs font-semibold bg-pink-600 text-white px-2 py-1 rounded-full uppercase">New</span>
                     <span className="absolute bottom-2 left-2 text-sm font-bold text-white px-1 py-0.5 rounded-full">#{index + 1}</span>
                   </div>
@@ -118,7 +116,7 @@ const CreatorProfile: React.FC<CreatorProfileProps> = ({ creator, onClose }) => 
                 Limited offer -70% off for 31 days!
               </div>
               <div className="flex items-center space-x-3">
-                <Image src={creator.image} alt={creator.name} width={40} height={40} className="w-10 h-10 rounded-full object-cover" />
+                <img src={creator.image} alt={creator.name} width={40} height={40} className="w-10 h-10 rounded-full object-cover" />
                 <p className="text-gray-300 text-sm">Hey, baby! I&apos;m treating you to 70% Off&mdash;don&apos;t miss out! Hit that button to SUB, and let&apos;s turn up the heat to-</p>
               </div>
               <a href="#" className="text-gray-400 hover:underline text-sm">Read more</a>
