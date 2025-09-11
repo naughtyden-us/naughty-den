@@ -5,6 +5,198 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, User, signInWithEmailAndPassword } from 'firebase/auth';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
+interface Post {
+  id: number;
+  creatorName: string;
+  creatorImage: string;
+  content: string;
+  likes: number;
+  comments: { user: string; text: string }[];
+}
+
+interface LivePostsProps {
+  onClose: () => void;
+  user: User | null;
+}
+
+const initialPosts: Post[] = [
+  {
+    id: 1,
+    creatorName: 'Jon Ly',
+    creatorImage: 'https://images.unsplash.com/photo-1630280717628-7d0d071cf2e3?q=80&w=1160&auto=format&fit=crop',
+    content: "Live from the studio! Working on some new looks for my next project. What do you think?",
+    likes: 58,
+    comments: [
+      { user: 'User1', text: 'This is amazing! ❤️' },
+      { user: 'User2', text: 'Love the creativity!' },
+    ],
+  },
+  {
+    id: 2,
+    creatorName: 'Seth Doyle',
+    creatorImage: 'https://images.unsplash.com/photo-1630520707335-9e4e79b731c3?q=80&w=1160&auto=format&fit=crop',
+    content: "Behind the scenes of my latest photoshoot! It was a blast. Thanks to everyone who tuned in!",
+    likes: 120,
+    comments: [
+      { user: 'User3', text: 'You are so talented!' },
+      { user: 'User4', text: 'When is the next live session?' },
+    ],
+  },
+  {
+    id: 3,
+    creatorName: 'Maria Rodriguez',
+    creatorImage: 'https://images.unsplash.com/photo-1728463087178-a8c804a5eec2?q=80&w=1160&auto=format&fit=crop',
+    content: "New day, new adventure! Excited to capture some stunning landscapes today. Wish me luck!",
+    likes: 87,
+    comments: [
+      { user: 'User5', text: 'Can\'t wait to see the photos!' },
+      { user: 'User6', text: 'Love your work!' },
+    ],
+  },
+];
+
+const LivePosts: React.FC<LivePostsProps> = ({ onClose, user }) => {
+  const [posts, setPosts] = useState<Post[]>(initialPosts);
+  const [newPostContent, setNewPostContent] = useState('');
+
+  const handleLike = (postId: number) => {
+    setPosts(posts.map(post => 
+      post.id === postId ? { ...post, likes: post.likes + 1 } : post
+    ));
+  };
+
+  const handleComment = (postId: number, commentText: string) => {
+    if (!user) return;
+    setPosts(posts.map(post => 
+      post.id === postId ? {
+        ...post,
+        comments: [...post.comments, { user: user.displayName || 'Anonymous', text: commentText }]
+      } : post
+    ));
+  };
+
+  const handleNewPost = () => {
+    if (!user || !newPostContent.trim()) return;
+    const newPost: Post = {
+      id: posts.length + 1,
+      creatorName: user.displayName || 'New Creator',
+      creatorImage: user.photoURL || 'https://placehold.co/100x100',
+      content: newPostContent,
+      likes: 0,
+      comments: [],
+    };
+    setPosts([newPost, ...posts]);
+    setNewPostContent('');
+  };
+
+  return (
+    <div className="bg-gray-950 text-white min-h-screen font-sans">
+      <div className="p-6 md:p-12">
+        <div className="flex justify-between items-center mb-6 md:mb-12 relative">
+          <button onClick={onClose} className="py-2 px-4 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
+            Back
+          </button>
+          <div className="flex flex-col items-center absolute left-1/2 transform -translate-x-1/2">
+            <img src="/logo.png" alt="Naughty Den Logo" width={80} height={32} className="w-auto h-8 md:h-10" />
+            <h1 className="text-3xl font-bold mt-2 text-pink-600">Naughty Talks</h1>
+          </div>
+        </div>
+
+        {/* New Post Form */}
+        {user && (
+          <div className="max-w-3xl mx-auto bg-gray-900 p-6 rounded-xl shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-4">Create a New Post</h2>
+            <textarea
+              value={newPostContent}
+              onChange={(e) => setNewPostContent(e.target.value)}
+              className="w-full h-24 p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-pink-600 resize-none"
+              placeholder="Share your latest update or photos..."
+            />
+            <button
+              onClick={handleNewPost}
+              className="mt-4 py-2 px-6 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors"
+            >
+              Post
+            </button>
+          </div>
+        )}
+
+        {/* Live Posts */}
+        <div className="max-w-3xl mx-auto space-y-8">
+          {posts.map(post => (
+            <div key={post.id} className="bg-gray-900 p-6 rounded-xl shadow-lg">
+              <div className="flex items-center space-x-4 mb-4">
+                <img
+                  src={post.creatorImage}
+                  alt={post.creatorName}
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-full object-cover border-2 border-pink-600"
+                />
+                <div>
+                  <p className="font-semibold">{post.creatorName}</p>
+                  <p className="text-sm text-gray-400">posted live</p>
+                </div>
+              </div>
+              <p className="text-gray-300 mb-4">{post.content}</p>
+              <div className="flex items-center space-x-4 text-gray-400">
+                <button
+                  onClick={() => handleLike(post.id)}
+                  className="flex items-center space-x-1 hover:text-pink-500 transition-colors"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                    className="w-5 h-5"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.936 0-3.694 1.353-4.321 3.235-.916-1.882-2.685-3.235-4.621-3.235C4.599 3.75 2.5 5.765 2.5 8.25c0 3.867 3.93 7.825 8.762 11.233a.5.5 0 00.5.158c.49 0 4.838-3.958 8.762-11.233z" />
+                  </svg>
+                  <span>{post.likes}</span>
+                </button>
+                <span className="text-sm">{post.comments.length} Comments</span>
+              </div>
+              {/* Comments Section */}
+              <div className="mt-4 border-t border-gray-800 pt-4 space-y-2">
+                {post.comments.map((comment, index) => (
+                  <div key={index} className="bg-gray-800 p-3 rounded-lg text-sm">
+                    <span className="font-semibold text-white">{comment.user}:</span> <span className="text-gray-300">{comment.text}</span>
+                  </div>
+                ))}
+                {user && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const form = e.target as HTMLFormElement;
+                      const commentInput = form.elements.namedItem('comment') as HTMLInputElement;
+                      handleComment(post.id, commentInput.value);
+                      commentInput.value = '';
+                    }}
+                    className="flex items-center space-x-2 mt-4"
+                  >
+                    <input
+                      type="text"
+                      name="comment"
+                      placeholder="Add a comment..."
+                      className="flex-1 p-2 rounded-lg bg-gray-700 text-white border-none focus:outline-none focus:ring-2 focus:ring-pink-600"
+                    />
+                    <button type="submit" className="py-2 px-4 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors text-sm">
+                      Post
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 interface Creator {
   id: number;
   name: string;
@@ -13,52 +205,76 @@ interface Creator {
   isAd: boolean;
   image: string;
   type: string;
+  likes: number;
 }
 
 interface CreatorCardProps {
   creator: Creator;
   onViewProfile: (creator: Creator) => void;
+  onLike: (creatorId: number) => void;
 }
 
-const CreatorCard: React.FC<CreatorCardProps> = ({ creator, onViewProfile }) => (
-  <div
-    className="relative overflow-hidden rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105 cursor-pointer"
-    onClick={() => onViewProfile(creator)}
-  >
-    <img src={creator.image} alt={creator.name} width={400} height={400} className="w-full h-auto object-cover" />
-    <div className="absolute top-2 right-2 flex space-x-2">
-      {creator.isAd && (
-        <span className="text-xs font-semibold bg-pink-600 text-white px-2 py-1 rounded-full uppercase">Ad</span>
-      )}
-    </div>
-    <div className="p-4 bg-gray-900 text-white">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-lg font-semibold">{creator.name}</h3>
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6 text-pink-500">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.936 0-3.694 1.353-4.321 3.235-.916-1.882-2.685-3.235-4.621-3.235C4.599 3.75 2.5 5.765 2.5 8.25c0 3.867 3.93 7.825 8.762 11.233a.5.5 0 00.5.158c.49 0 4.838-3.958 8.762-11.233z" />
-        </svg>
+const CreatorCard: React.FC<CreatorCardProps> = ({ creator, onViewProfile, onLike }) => {
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const handleLikeClick = () => {
+    onLike(creator.id);
+    setIsAnimating(true);
+  };
+
+  return (
+    <div
+      onClick={() => onViewProfile(creator)}
+      className="relative overflow-hidden rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105 cursor-pointer"
+    >
+      <div>
+        <img src={creator.image} alt={creator.name} width={400} height={400} className="w-full h-auto object-cover" />
       </div>
-      <div className="flex justify-between items-center text-sm text-gray-400 mb-2">
-        <span>{creator.type}</span>
-        <div className="flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-400 mr-1" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M9.049 2.927c.3-.921 1.63-0.921 1.932 0l1.258 3.864a1 1 0 00.95.691h4.072c.969 0 1.371 1.243.588 1.81l-3.297 2.388a1 1 0 00-.364 1.118l1.258 3.864c.3.921-.755 1.688-1.54 1.118l-3.297-2.388a1 1 0 00-1.176 0l-3.297 2.388c-.784.57-1.84-.197-1.54-1.118l1.258-3.864a1 1 0 00-.364-1.118L2.091 9.29c-.783-.567-.381-1.81.588-1.81h4.072a1 1 0 00.95-.691l1.258-3.864z" />
-          </svg>
-          <span>{creator.rating}</span>
+      <div className="absolute top-2 right-2 flex space-x-2">
+        {creator.isAd && (
+          <span className="text-xs font-semibold bg-pink-600 text-white px-2 py-1 rounded-full uppercase">Ad</span>
+        )}
+      </div>
+      <div className="p-4 bg-gray-900 text-white">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-lg font-semibold">{creator.name}</h3>
+          <div className="flex items-center space-x-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleLikeClick(); }}>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className={`w-6 h-6 text-pink-500 transition-transform ${isAnimating ? 'animate-pulse-glow' : ''}`}
+              onAnimationEnd={() => setIsAnimating(false)}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.936 0-3.694 1.353-4.321 3.235-.916-1.882-2.685-3.235-4.621-3.235C4.599 3.75 2.5 5.765 2.5 8.25c0 3.867 3.93 7.825 8.762 11.233a.5.5 0 00.5.158c.49 0 4.838-3.958 8.762-11.233z" />
+            </svg>
+            <span className="text-sm">{creator.likes}</span>
+          </div>
+        </div>
+        <div className="flex justify-between items-center text-sm text-gray-400 mb-2">
+          <span>{creator.type}</span>
+          <div className="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-400 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M9.049 2.927c.3-.921 1.63-0.921 1.932 0l1.258 3.864a1 1 0 00.95.691h4.072c.969 0 1.371 1.243.588 1.81l-3.297 2.388a1 1 0 00-.364 1.118l1.258 3.864c.3.921-.755 1.688-1.54 1.118l-3.297-2.388a1 1 0 00-1.176 0l-3.297 2.388c-.784.57-1.84-.197-1.54-1.118l1.258-3.864a1 1 0 00-.364-1.118L2.091 9.29c-.783-.567-.381-1.81.588-1.81h4.072a1 1 0 00.95-.691l1.258-3.864z" />
+            </svg>
+            <span>{creator.rating}</span>
+          </div>
+        </div>
+        <div className="flex justify-between items-center text-sm font-bold text-white mb-4">
+          <span>${creator.price}</span>
+          <span className="text-gray-400">/hour</span>
+        </div>
+        <div className="flex space-x-2">
+          <button className="flex-1 py-2 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
+            Chat
+          </button>
         </div>
       </div>
-      <div className="flex justify-between items-center text-sm font-bold text-white mb-4">
-        <span>${creator.price}</span>
-        <span className="text-gray-400">/hour</span>
-      </div>
-      <div className="flex space-x-2">
-        <button className="flex-1 py-2 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
-          Chat
-        </button>
-      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface CreatorProfileProps {
   creator: Creator;
@@ -368,7 +584,7 @@ const Preloader = () => (
 );
 
 // Mock data for featured creators
-const creators: Creator[] = [
+const initialCreators: Creator[] = [
   {
     id: 1,
     name: 'Jon Ly',
@@ -376,7 +592,8 @@ const creators: Creator[] = [
     price: 34.50,
     isAd: false,
     image: 'https://images.unsplash.com/photo-1630280717628-7d0d071cf2e3?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    type: 'Landscape',
+    type: 'Subscription',
+    likes: 124,
   },
   {
     id: 2,
@@ -385,7 +602,8 @@ const creators: Creator[] = [
     price: 32.00,
     isAd: true,
     image: 'https://images.unsplash.com/photo-1630520707335-9e4e79b731c3?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    type: 'Portrait',
+    type: 'Subscription',
+    likes: 210,
   },
   {
     id: 3,
@@ -394,7 +612,8 @@ const creators: Creator[] = [
     price: 35.50,
     isAd: false,
     image: 'https://images.unsplash.com/photo-1550428083-7019ebe39b45?q=80&w=1102&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    type: 'Landscape',
+    type: 'Subscription',
+    likes: 315,
   },
   {
     id: 4,
@@ -403,7 +622,8 @@ const creators: Creator[] = [
     price: 32.50,
     isAd: false,
     image: 'https://images.unsplash.com/photo-1728463087178-a8c804a5eec2?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    type: 'Architecture',
+    type: 'Subscription',
+    likes: 98,
   },
   {
     id: 5,
@@ -412,7 +632,8 @@ const creators: Creator[] = [
     price: 37.00,
     isAd: true,
     image: 'https://images.unsplash.com/photo-1673379421016-b84b1dc410ca?q=80&w=1092&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    type: 'Architecture',
+    type: 'Subscription',
+    likes: 156,
   },
   {
     id: 6,
@@ -421,7 +642,8 @@ const creators: Creator[] = [
     price: 38.00,
     isAd: false,
     image: 'https://images.unsplash.com/photo-1584996433468-6e702c8fc9d9?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    type: 'Architecture',
+    type: 'Subscription',
+    likes: 421,
   },
   {
     id: 7,
@@ -430,7 +652,8 @@ const creators: Creator[] = [
     price: 30.00,
     isAd: false,
     image: 'https://images.unsplash.com/photo-1676328012648-ee16da2e08d8?q=80&w=1233&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    type: 'Portrait',
+    type: 'Subscription',
+    likes: 85,
   },
   {
     id: 8,
@@ -439,7 +662,8 @@ const creators: Creator[] = [
     price: 30.00,
     isAd: false,
     image: 'https://images.unsplash.com/photo-1676328012648-ee16da2e08d8?q=80&w=1233&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    type: 'Portrait',
+    type: 'Subscription',
+    likes: 150,
   },
 
 ];
@@ -459,7 +683,9 @@ const Home = () => {
   const [isLoginModalOpen, setIsLoginModal] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
+  const [selectedPage, setSelectedPage] = useState<'home' | 'live-posts'>('home');
   const [auth, setAuth] = useState<any>(null);
+  const [creators, setCreators] = useState<Creator[]>(initialCreators);
 
   useEffect(() => {
     const firebaseApp = initializeApp(firebaseConfig);
@@ -501,8 +727,20 @@ const Home = () => {
     }
   };
 
+  const handleLike = (id: number) => {
+    setCreators(prevCreators => 
+      prevCreators.map(creator => 
+        creator.id === id ? { ...creator, likes: creator.likes + 1 } : creator
+      )
+    );
+  };
+
   if (isLoading) {
     return <Preloader />;
+  }
+
+  if (selectedPage === 'live-posts') {
+    return <LivePosts onClose={() => setSelectedPage('home')} user={user} />;
   }
 
   if (selectedCreator) {
@@ -532,6 +770,23 @@ const Home = () => {
           box-shadow: 0 0 5px #ec4899, 0 0 20px #ec4899;
           filter: brightness(1.2);
         }
+        @keyframes pulse-glow {
+          0% {
+            transform: scale(1);
+            filter: drop-shadow(0 0 0 rgba(236, 72, 153, 0.7));
+          }
+          50% {
+            transform: scale(1.1);
+            filter: drop-shadow(0 0 8px rgba(236, 72, 153, 1));
+          }
+          100% {
+            transform: scale(1);
+            filter: drop-shadow(0 0 0 rgba(236, 72, 153, 0));
+          }
+        }
+        .animate-pulse-glow {
+          animation: pulse-glow 0.6s ease-in-out;
+        }
       ` }} />
       {/* Header */}
       <header className="relative z-50 py-4 px-6 md:px-12 flex justify-between items-center">
@@ -539,14 +794,16 @@ const Home = () => {
           <img src="/logo.png" alt="Naughty Den Logo" width={100} height={40} className="h-10 w-auto" />
         </div>
         <nav className="hidden md:flex space-x-6 text-gray-400">
-          <a href="#" className="hover:text-white transition-colors">Home</a>
+          <a href="#" onClick={() => setSelectedPage('home')} className="hover:text-white transition-colors">Home</a>
           <a href="#" className="hover:text-white transition-colors">Creators</a>
           <a href="#" className="hover:text-white transition-colors">Search photos...</a>
-          <a href="#" className="hover:text-white transition-colors">Blog</a>
+          <a href="#" onClick={() => setSelectedPage('live-posts')} className="hover:text-white transition-colors">Get Naughty</a>
           <a href="#" className="hover:text-white transition-colors">Contact</a>
         </nav>
         <div className="flex items-center space-x-4">
-          <a href="#" className="hidden md:block text-gray-400 hover:text-white transition-colors">Creator dashboard</a>
+          {user === null && (
+            <a href="#" className="hidden md:block text-gray-400 hover:text-white transition-colors">Creator dashboard</a>
+          )}
           {user ? (
             <>
               <div className="flex items-center space-x-2">
@@ -611,7 +868,7 @@ const Home = () => {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           {creators.map((creator) => (
-            <CreatorCard key={creator.id} creator={creator} onViewProfile={setSelectedCreator} />
+            <CreatorCard key={creator.id} creator={creator} onViewProfile={setSelectedCreator} onLike={handleLike} />
           ))}
         </div>
       </section>
@@ -626,7 +883,7 @@ const Home = () => {
             <h4 className="text-lg font-bold text-white mb-2">Explore</h4>
             <ul>
               <li className="mb-1"><a href="#" className="hover:underline">Gallery</a></li>
-              <li className="mb-1"><a href="#" className="hover:underline">Blog</a></li>
+              <li className="mb-1"><a href="#" onClick={() => setSelectedPage('live-posts')} className="hover:underline">Get Naughty</a></li>
               <li className="mb-1"><a href="#" className="hover:underline">Community</a></li>
               <li className="mb-1"><a href="#" className="hover:underline">Creator Events</a></li>
             </ul>
