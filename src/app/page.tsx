@@ -583,6 +583,42 @@ const Preloader = () => (
   </div>
 );
 
+interface DisclaimerModalProps {
+  onConfirm: () => void;
+  onExit: () => void;
+}
+
+const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ onConfirm, onExit }) => {
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-[100]">
+      <div className="bg-gray-900 rounded-lg p-8 w-full max-w-md mx-4 text-white text-center shadow-lg border border-pink-600">
+        <h2 className="text-2xl font-bold mb-4">Adult Content Warning</h2>
+        <p className="mb-4">
+          This app contains adult content. You must be 18+ (or legal age in your region) to enter.
+        </p>
+        <p className="mb-6">
+          By continuing, you confirm that you meet the age requirement and consent to view explicit material.
+        </p>
+        <div className="flex justify-center space-x-4">
+          <button
+            onClick={onConfirm}
+            className="px-6 py-3 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors font-bold"
+          >
+            I Am 18+
+          </button>
+          <button
+            onClick={onExit}
+            className="px-6 py-3 rounded-lg border border-gray-600 text-gray-400 hover:bg-gray-700 hover:text-white transition-colors font-bold"
+          >
+            Exit
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 // Mock data for featured creators
 const initialCreators: Creator[] = [
   {
@@ -686,6 +722,7 @@ const Home = () => {
   const [selectedPage, setSelectedPage] = useState<'home' | 'live-posts'>('home');
   const [auth, setAuth] = useState<any>(null);
   const [creators, setCreators] = useState<Creator[]>(initialCreators);
+  const [isAgeConfirmed, setIsAgeConfirmed] = useState(false);
 
   useEffect(() => {
     const firebaseApp = initializeApp(firebaseConfig);
@@ -709,6 +746,11 @@ const Home = () => {
         setIsLoginModal(false);
       }
     });
+
+    const ageConfirmed = localStorage.getItem('ageConfirmed');
+    if (ageConfirmed === 'true') {
+      setIsAgeConfirmed(true);
+    }
     
     setTimeout(() => {
       setIsLoading(false);
@@ -716,6 +758,15 @@ const Home = () => {
 
     return () => unsubscribe();
   }, []);
+
+  const handleAgeConfirm = () => {
+    localStorage.setItem('ageConfirmed', 'true');
+    setIsAgeConfirmed(true);
+  };
+
+  const handleAgeExit = () => {
+    window.location.href = 'https://www.google.com/';
+  };
 
   const handleLogout = async () => {
     if (auth) {
@@ -737,6 +788,10 @@ const Home = () => {
 
   if (isLoading) {
     return <Preloader />;
+  }
+
+  if (!isAgeConfirmed) {
+    return <DisclaimerModal onConfirm={handleAgeConfirm} onExit={handleAgeExit} />;
   }
 
   if (selectedPage === 'live-posts') {
