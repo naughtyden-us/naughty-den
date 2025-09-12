@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, User, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, User, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 interface Post {
@@ -58,7 +58,9 @@ const initialPosts: Post[] = [
 const LivePosts: React.FC<LivePostsProps> = ({ onClose, user }) => {
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [newPostContent, setNewPostContent] = useState('');
-
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState('');
+  
   const handleLike = (postId: number) => {
     setPosts(posts.map(post =>
       post.id === postId ? { ...post, likes: post.likes + 1 } : post
@@ -89,6 +91,55 @@ const LivePosts: React.FC<LivePostsProps> = ({ onClose, user }) => {
     setNewPostContent('');
   };
 
+  const generatePostIdea = async () => {
+    setIsGenerating(true);
+    setError('');
+    const prompt = "Generate a short, engaging, and creative social media post idea for a creator on a platform that shares photos. The tone should be flirty, playful, and confident, and the post should be under 200 characters.";
+    const apiKey = "AIzaSyDWUs3P7LFpp3XaaxGGcJBjH9tuiaB3sDw"; 
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+    const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+    };
+    
+    // Exponential backoff retry logic
+    let attempts = 0;
+    const maxAttempts = 3;
+    let success = false;
+    let generatedText = '';
+
+    while(attempts < maxAttempts && !success) {
+      try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        const candidate = result.candidates?.[0];
+        if (candidate && candidate.content?.parts?.[0]?.text) {
+          generatedText = candidate.content.parts[0].text;
+          success = true;
+        } else {
+          throw new Error('No generated text in response');
+        }
+      } catch (error) {
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+        } else {
+          console.error("Failed to generate post idea after multiple attempts:", error);
+          setError("Failed to generate post idea. Please try again.");
+        }
+      }
+    }
+
+    if (success) {
+      setNewPostContent(generatedText);
+    }
+    setIsGenerating(false);
+  };
+
   return (
     <div className="bg-gray-950 text-white min-h-screen font-sans">
       <div className="p-6 md:p-12">
@@ -112,12 +163,32 @@ const LivePosts: React.FC<LivePostsProps> = ({ onClose, user }) => {
               className="w-full h-24 p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:border-pink-600 resize-none"
               placeholder="Share your latest update or photos..."
             />
-            <button
-              onClick={handleNewPost}
-              className="mt-4 py-2 px-6 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors"
-            >
-              Post
-            </button>
+            {error && <p className="text-red-500 text-center text-sm">{error}</p>}
+            <div className="flex justify-between items-center mt-4 space-x-2">
+              <button
+                onClick={handleNewPost}
+                className="py-2 px-6 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors flex-grow font-bold"
+              >
+                Post
+              </button>
+              <button
+                onClick={generatePostIdea}
+                disabled={isGenerating}
+                className="py-2 px-6 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-grow-0 flex items-center justify-center space-x-2"
+              >
+                {isGenerating ? (
+                  <svg className="animate-spin h-5 w-5 text-pink-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <>
+                    <span className="text-pink-600">✨</span>
+                    <span className="hidden md:inline">Generate Post Idea</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         )}
 
@@ -473,13 +544,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, auth, onLogin }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isCreator, setIsCreator] = useState(false);
+  const [displayName, setDisplayName] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      onLogin(isCreator);
       onClose();
     } catch (err: any) {
       setError(err.message);
@@ -490,8 +561,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, auth, onLogin }) => {
     e.preventDefault();
     setError('');
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      onLogin(isCreator);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(userCredential.user, { displayName });
       onClose();
     } catch (err: any) {
       setError(err.message);
@@ -503,7 +574,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, auth, onLogin }) => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      onLogin(false); // Default to user for Google login
       onClose();
     } catch (err: any) {
       setError(err.message);
@@ -555,6 +625,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, auth, onLogin }) => {
                   className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg py-3 px-4 focus:outline-none focus:border-pink-600"
                 />
               </div>
+              {activeForm === 'signup' && (
+                <div>
+                  <label className="sr-only" htmlFor="displayName">Display Name</label>
+                  <input
+                    type="text"
+                    id="displayName"
+                    placeholder="Display Name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="w-full bg-gray-800 text-white border border-gray-700 rounded-lg py-3 px-4 focus:outline-none focus:border-pink-600"
+                  />
+                </div>
+              )}
               <div>
                 <label className="sr-only" htmlFor="password">Password</label>
                 <div className="relative">
@@ -612,7 +695,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ onClose, auth, onLogin }) => {
               {activeForm === 'login' ? (
                 <>Don&apos;t have an account yet? <a href="#" onClick={(e) => { e.preventDefault(); setActiveForm('signup'); }} className="text-pink-600 font-bold hover:underline">CREATE ONE NOW</a></>
               ) : (
-                <>Already have an account? <a href="#" onClick={(e) => { e.preventDefault(); setActiveForm('login'); }} className="text-pink-600 font-bold hover:underline">LOG IN</a></>
+                <>Already have an account? <a href="#" onClick={(e) => { e.preventDefault(); setActiveForm('login-choice'); }} className="text-pink-600 font-bold hover:underline">LOG IN</a></>
               )}
             </div>
           </>
@@ -638,6 +721,9 @@ const DisclaimerModal: React.FC<DisclaimerModalProps> = ({ onConfirm, onExit }) 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-[100]">
       <div className="bg-gray-900 rounded-lg p-8 w-full max-w-md mx-4 text-white text-center shadow-lg border border-pink-600">
+        <div className="flex justify-center mb-4">
+          <img src="/logo.png" alt="Naughty Den Logo" className="w-24 h-auto" />
+        </div>
         <h2 className="text-2xl font-bold mb-4">Adult Content Warning</h2>
         <p className="mb-4">
           This app contains adult content. You must be 18+ (or legal age in your region) to enter.
@@ -747,7 +833,6 @@ const initialCreators: Creator[] = [
     type: 'Subscription',
     likes: 150,
   },
-
 ];
 
 const firebaseConfig = {
