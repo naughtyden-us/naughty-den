@@ -3,34 +3,85 @@
 import React, { useState, useEffect } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, User, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Creator } from './components/types';
 
-// Tailwind CSS CDN - this is a requirement for the single-file React component.
-// The code assumes this is already loaded in the environment.
+// Tailwind CSS
+const AppCSS = () => (
+    <style dangerouslySetInnerHTML={{
+        __html: `
+            @import "tailwindcss";
 
-/**
- * @typedef {object} Post
- * @property {number} id
- * @property {string} creatorName
- * @property {string} creatorImage
- * @property {string} content
- * @property {number} likes
- * @property {Array<{user: string, text: string}>} comments
- */
+            :root {
+                --background: #ffffff;
+                --foreground: #171717;
+            }
 
-/**
- * @typedef {object} Profile
- * @property {string} uid
- * @property {string} displayName
- * @property {string} email
- * @property {string} photoURL
- * @property {boolean} isCreator
- * @property {string=} bio
- * @property {string[]=} categories
- * @property {boolean} isProfileComplete
- */
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --background: #0a0a0a;
+                    --foreground: #ededed;
+                }
+            }
+
+            body {
+                background: var(--background);
+                color: var(--foreground);
+                font-family: Arial, Helvetica, sans-serif;
+            }
+
+            @font-face {
+                font-family: 'Geist';
+                src: url('https://cdn.jsdelivr.net/npm/@geist-ui/fonts/geist/geist-bold.woff2') format('woff2');
+                font-weight: 400;
+                font-style: normal;
+            }
+            @font-face {
+                font-family: 'Geist';
+                src: url('https://cdn.jsdelivr.net/npm/@geist-ui/fonts/geist/geist-bold.woff2') format('woff2');
+                font-weight: 700;
+                font-style: normal;
+            }
+            body {
+                font-family: 'Geist', sans-serif;
+                font-weight: 700;
+            }
+            .logo-glow {
+                box-shadow: 0 0 5px #ec4899, 0 0 20px #ec4899;
+                filter: brightness(1.2);
+            }
+            @keyframes pulse-glow {
+                0% {
+                    transform: scale(1);
+                    filter: drop-shadow(0 0 0 rgba(236, 72, 153, 0.7));
+                }
+                50% {
+                    transform: scale(1.1);
+                    filter: drop-shadow(0 0 8px rgba(236, 72, 153, 1));
+                }
+                100% {
+                    transform: scale(1);
+                    filter: drop-shadow(0 0 0 rgba(236, 72, 153, 0));
+                }
+            }
+            .animate-pulse-glow {
+                animation: pulse-glow 0.6s ease-in-out;
+            }
+        `
+    }} />
+);
+
+// Type definitions
+interface Creator {
+    likes: number;
+    id: number;
+    name: string;
+    rating: number;
+    price: number;
+    isAd: boolean;
+    image: string;
+    type: string;
+}
 
 interface Profile {
     uid: string;
@@ -43,51 +94,17 @@ interface Profile {
     isProfileComplete: boolean;
 }
 
-/**
- * @typedef {object} LivePostsProps
- * @property {() => void} onClose
- * @property {User | null} user
- */
+interface Post {
+    id: number;
+    creatorName: string;
+    creatorImage: string;
+    content: string;
+    likes: number;
+    comments: Array<{ user: string; text: string }>;
+}
 
-/**
- * @typedef {object} Creator
- * @property {number} id
- * @property {string} name
- * @property {number} rating
- * @property {number} price
- * @property {boolean} isAd
- * @property {string} image
- * @property {string} type
- * @property {number} likes
- */
-
-/**
- * @typedef {object} CreatorCardProps
- * @property {Creator} creator
- * @property {(creator: Creator) => void} onViewProfile
- * @property {(creatorId: number) => void} onLike
- */
-
-/**
- * @typedef {object} CreatorProfileProps
- * @property {Creator} creator
- * @property {() => void} onClose
- */
-
-/**
- * @typedef {object} DisclaimerModalProps
- * @property {() => void} onConfirm
- * @property {() => void} onExit
- */
-
-/**
- * @typedef {object} LoginModalProps
- * @property {() => void} onClose
- * @property {any} auth
- * @property {(isCreator: boolean) => void} onLogin
- */
-
-const initialPosts = [
+// Initial data
+const initialPosts: Post[] = [
     {
         id: 1,
         creatorName: 'Jon Ly',
@@ -117,18 +134,159 @@ const initialPosts = [
         content: "New day, new adventure! Excited to capture some stunning landscapes today. Wish me luck!",
         likes: 87,
         comments: [
-            { user: 'User5', text: 'Can\'t wait to see the photos!' },
+            { user: 'User5', text: "Can't wait to see the photos!" },
             { user: 'User6', text: 'Love your work!' },
         ],
     },
 ];
 
-interface LivePostsProps {
-    onClose: () => void;
-    user: User | null;
-}
+const initialCreators: Creator[] = [
+    {
+        id: 1,
+        name: 'Jon Ly',
+        rating: 4.8,
+        price: 34.50,
+        isAd: false,
+        image: 'https://images.unsplash.com/photo-1630280717628-7d0d071cf2e3?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        type: 'Subscription',
+        likes: 124,
+    },
+    {
+        id: 2,
+        name: 'Seth Doyle',
+        rating: 4.6,
+        price: 32.00,
+        isAd: true,
+        image: 'https://images.unsplash.com/photo-1630520707335-9e4e79b731c3?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        type: 'Subscription',
+        likes: 210,
+    },
+    {
+        id: 3,
+        name: 'Riyaan Khan',
+        rating: 4.9,
+        price: 35.50,
+        isAd: false,
+        image: 'https://images.unsplash.com/photo-1550428083-7019ebe39b45?q=80&w=1102&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        type: 'Subscription',
+        likes: 315,
+    },
+    {
+        id: 4,
+        name: 'Maria Rodriguez',
+        rating: 4.7,
+        price: 32.50,
+        isAd: false,
+        image: 'https://images.unsplash.com/photo-1728463087178-a8c804a5eec2?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        type: 'Subscription',
+        likes: 98,
+    },
+    {
+        id: 5,
+        name: 'Sofia Mykyte',
+        rating: 4.7,
+        price: 37.00,
+        isAd: true,
+        image: 'https://images.unsplash.com/photo-1673379421016-b84b1dc410ca?q=80&w=1092&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        type: 'Subscription',
+        likes: 156,
+    },
+    {
+        id: 6,
+        name: 'Hao Leong',
+        rating: 4.8,
+        price: 38.00,
+        isAd: false,
+        image: 'https://images.unsplash.com/photo-1584996433468-6e702c8fc9d9?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        type: 'Subscription',
+        likes: 421,
+    },
+    {
+        id: 7,
+        name: 'Jordan Travers',
+        rating: 4.5,
+        price: 30.00,
+        isAd: false,
+        image: 'https://images.unsplash.com/photo-1676328012648-ee16da2e08d8?q=80&w=1233&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        type: 'Subscription',
+        likes: 85,
+    },
+    {
+        id: 8,
+        name: 'Jordan Travers',
+        rating: 4.5,
+        price: 30.00,
+        isAd: false,
+        image: 'https://images.unsplash.com/photo-1676328012648-ee16da2e08d8?q=80&w=1233&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+        type: 'Subscription',
+        likes: 150,
+    },
+];
 
-const LivePosts = ({ onClose, user }: LivePostsProps) => {
+// Components from separate files, combined here
+const CreatorCard: React.FC<{ creator: Creator; onViewProfile: (creator: Creator) => void; onLike: (creatorId: number) => void }> = ({ creator, onViewProfile, onLike }) => {
+    const [isAnimating, setIsAnimating] = useState(false);
+
+    const handleLikeClick = () => {
+        onLike(creator.id);
+        setIsAnimating(true);
+    };
+
+    return (
+        <div
+            onClick={() => onViewProfile(creator)}
+            className="relative overflow-hidden rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105 cursor-pointer"
+        >
+            <div>
+                <img src={creator.image} alt={creator.name} width={400} height={400} className="w-full h-auto object-cover" />
+            </div>
+            <div className="absolute top-2 right-2 flex space-x-2">
+                {creator.isAd && (
+                    <span className="text-xs font-semibold bg-pink-600 text-white px-2 py-1 rounded-full uppercase">Ad</span>
+                )}
+            </div>
+            <div className="p-4 bg-gray-900 text-white">
+                <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-lg font-semibold">{creator.name}</h3>
+                    <div className="flex items-center space-x-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleLikeClick(); }}>
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                            strokeWidth={1.5}
+                            stroke="currentColor"
+                            className={`w-6 h-6 text-pink-500 transition-transform ${isAnimating ? 'animate-pulse-glow' : ''}`}
+                            onAnimationEnd={() => setIsAnimating(false)}
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.936 0-3.694 1.353-4.321 3.235-.916-1.882-2.685-3.235-4.621-3.235C4.599 3.75 2.5 5.765 2.5 8.25c0 3.867 3.93 7.825 8.762 11.233a.5.5 0 00.5.158c.49 0 4.838-3.958 8.762-11.233z" />
+                        </svg>
+                        <span className="text-sm">{creator.likes}</span>
+                    </div>
+                </div>
+                <div className="flex justify-between items-center text-sm text-gray-400 mb-2">
+                    <span>{creator.type}</span>
+                    <div className="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-400 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M9.049 2.927c.3-.921 1.63-0.921 1.932 0l1.258 3.864a1 1 0 00.95.691h4.072c.969 0 1.371 1.243.588 1.81l-3.297 2.388a1 1 0 00-.364 1.118l1.258 3.864c.3.921-.755 1.688-1.54 1.118l-3.297-2.388a1 1 0 00-1.176 0l-3.297 2.388c-.784.57-1.84-.197-1.54-1.118l1.258-3.864a1 1 0 00-.364-1.118L2.091 9.29c-.783-.567-.381-1.81.588-1.81h4.072a1 1 0 00.95-.691l1.258-3.864z" />
+                        </svg>
+                        <span>{creator.rating}</span>
+                    </div>
+                </div>
+                <div className="flex justify-between items-center text-sm font-bold text-white mb-4">
+                    <span>${creator.price}</span>
+                    <span className="text-gray-400">/hour</span>
+                </div>
+                <div className="flex space-x-2">
+                    <button className="flex-1 py-2 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
+                        Chat
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const LivePosts = ({ onClose, user }: { onClose: () => void; user: User | null }) => {
     const [posts, setPosts] = useState(initialPosts);
     const [newPostContent, setNewPostContent] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
@@ -140,7 +298,7 @@ const LivePosts = ({ onClose, user }: LivePostsProps) => {
         ));
     };
 
-    const handleComment = (postId: number, commentText: any) => {
+    const handleComment = (postId: number, commentText: string) => {
         if (!user) return;
         setPosts(posts.map(post =>
             post.id === postId ? {
@@ -168,7 +326,7 @@ const LivePosts = ({ onClose, user }: LivePostsProps) => {
         setIsGenerating(true);
         setError('');
         const prompt = "Generate a short, engaging, and creative social media post idea for a creator on a platform that shares photos. The tone should be flirty, playful, and confident, and the post should be under 200 characters.";
-        const apiKey = "AIzaSyDWUs3P7LFpp3XaaxGGcJBjH9tuiaB3sDw";
+        const apiKey = "";
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
         const payload = {
@@ -339,157 +497,7 @@ const LivePosts = ({ onClose, user }: LivePostsProps) => {
     );
 };
 
-const initialCreators = [
-    {
-        id: 1,
-        name: 'Jon Ly',
-        rating: 4.8,
-        price: 34.50,
-        isAd: false,
-        image: 'https://images.unsplash.com/photo-1630280717628-7d0d071cf2e3?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-        type: 'Subscription',
-        likes: 124,
-    },
-    {
-        id: 2,
-        name: 'Seth Doyle',
-        rating: 4.6,
-        price: 32.00,
-        isAd: true,
-        image: 'https://images.unsplash.com/photo-1630520707335-9e4e79b731c3?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-        type: 'Subscription',
-        likes: 210,
-    },
-    {
-        id: 3,
-        name: 'Riyaan Khan',
-        rating: 4.9,
-        price: 35.50,
-        isAd: false,
-        image: 'https://images.unsplash.com/photo-1550428083-7019ebe39b45?q=80&w=1102&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-        type: 'Subscription',
-        likes: 315,
-    },
-    {
-        id: 4,
-        name: 'Maria Rodriguez',
-        rating: 4.7,
-        price: 32.50,
-        isAd: false,
-        image: 'https://images.unsplash.com/photo-1728463087178-a8c804a5eec2?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-        type: 'Subscription',
-        likes: 98,
-    },
-    {
-        id: 5,
-        name: 'Sofia Mykyte',
-        rating: 4.7,
-        price: 37.00,
-        isAd: true,
-        image: 'https://images.unsplash.com/photo-1673379421016-b84b1dc410ca?q=80&w=1092&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-        type: 'Subscription',
-        likes: 156,
-    },
-    {
-        id: 6,
-        name: 'Hao Leong',
-        rating: 4.8,
-        price: 38.00,
-        isAd: false,
-        image: 'https://images.unsplash.com/photo-1584996433468-6e702c8fc9d9?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-        type: 'Subscription',
-        likes: 421,
-    },
-    {
-        id: 7,
-        name: 'Jordan Travers',
-        rating: 4.5,
-        price: 30.00,
-        isAd: false,
-        image: 'https://images.unsplash.com/photo-1676328012648-ee16da2e08d8?q=80&w=1233&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-        type: 'Subscription',
-        likes: 85,
-    },
-    {
-        id: 8,
-        name: 'Jordan Travers',
-        rating: 4.5,
-        price: 30.00,
-        isAd: false,
-        image: 'https://images.unsplash.com/photo-1676328012648-ee16da2e08d8?q=80&w=1233&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-        type: 'Subscription',
-        likes: 150,
-    },
-];
-
-const CreatorCard = ({ creator, onViewProfile, onLike }: { creator: Creator; onViewProfile: (creator: Creator) => void; onLike: (creatorId: number) => void }) => {
-    const [isAnimating, setIsAnimating] = useState(false);
-
-    const handleLikeClick = () => {
-        onLike(creator.id);
-        setIsAnimating(true);
-    };
-
-    return (
-        <div
-            onClick={() => onViewProfile(creator)}
-            className="relative overflow-hidden rounded-xl shadow-lg transform transition-transform duration-300 hover:scale-105 cursor-pointer"
-        >
-            <div>
-                <img src={creator.image} alt={creator.name} width={400} height={400} className="w-full h-auto object-cover" />
-            </div>
-            <div className="absolute top-2 right-2 flex space-x-2">
-                {creator.isAd && (
-                    <span className="text-xs font-semibold bg-pink-600 text-white px-2 py-1 rounded-full uppercase">Ad</span>
-                )}
-            </div>
-            <div className="p-4 bg-gray-900 text-white">
-                <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-semibold">{creator.name}</h3>
-                    <div className="flex items-center space-x-1 cursor-pointer" onClick={(e) => { e.stopPropagation(); handleLikeClick(); }}>
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="currentColor"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                            stroke="currentColor"
-                            className={`w-6 h-6 text-pink-500 transition-transform ${isAnimating ? 'animate-pulse-glow' : ''}`}
-                            onAnimationEnd={() => setIsAnimating(false)}
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.936 0-3.694 1.353-4.321 3.235-.916-1.882-2.685-3.235-4.621-3.235C4.599 3.75 2.5 5.765 2.5 8.25c0 3.867 3.93 7.825 8.762 11.233a.5.5 0 00.5.158c.49 0 4.838-3.958 8.762-11.233z" />
-                        </svg>
-                        <span className="text-sm">{creator.likes}</span>
-                    </div>
-                </div>
-                <div className="flex justify-between items-center text-sm text-gray-400 mb-2">
-                    <span>{creator.type}</span>
-                    <div className="flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-400 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M9.049 2.927c.3-.921 1.63-0.921 1.932 0l1.258 3.864a1 1 0 00.95.691h4.072c.969 0 1.371 1.243.588 1.81l-3.297 2.388a1 1 0 00-.364 1.118l1.258 3.864c.3.921-.755 1.688-1.54 1.118l-3.297-2.388a1 1 0 00-1.176 0l-3.297 2.388c-.784.57-1.84-.197-1.54-1.118l1.258-3.864a1 1 0 00-.364-1.118L2.091 9.29c-.783-.567-.381-1.81.588-1.81h4.072a1 1 0 00.95-.691l1.258-3.864z" />
-                        </svg>
-                        <span>{creator.rating}</span>
-                    </div>
-                </div>
-                <div className="flex justify-between items-center text-sm font-bold text-white mb-4">
-                    <span>${creator.price}</span>
-                    <span className="text-gray-400">/hour</span>
-                </div>
-                <div className="flex space-x-2">
-                    <button className="flex-1 py-2 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
-                        Chat
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-interface EnlargedImageViewerProps {
-    imageUrl: string;
-    onClose: () => void;
-}
-
-const EnlargedImageViewer = ({ imageUrl, onClose }: EnlargedImageViewerProps) => (
+const EnlargedImageViewer = ({ imageUrl, onClose }: { imageUrl: string; onClose: () => void }) => (
     <div className="fixed inset-0 bg-black bg-opacity-90 z-[101] flex justify-center items-center p-4">
         <div className="relative">
             <button
@@ -669,15 +677,70 @@ const CreatorProfile = ({ creator, onClose }: { creator: Creator; onClose: () =>
     );
 };
 
+// KYC Verification page component, with a simulated verification flow
+const VerifyKYCPage = ({ onClose }: { onClose: () => void }) => {
+    const [status, setStatus] = useState('pending'); // 'pending', 'success', 'failed'
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setStatus('success'); // Simulate success after a delay
+        }, 3000);
+
+        return () => clearTimeout(timer);
+    }, []);
+
+    return (
+        <div className="flex items-center justify-center min-h-screen bg-gray-950 text-white p-4">
+            <div className="text-center p-8 bg-gray-900 rounded-lg shadow-xl max-w-sm w-full">
+                <h1 className="text-3xl font-bold mb-4">KYC Verification</h1>
+                <div className="mb-6">
+                    {status === 'pending' && (
+                        <>
+                            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-pink-500 mx-auto mb-4"></div>
+                            <p className="text-gray-300">Verification in progress...</p>
+                        </>
+                    )}
+                    {status === 'success' && (
+                        <>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-green-500 mx-auto mb-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-green-400 font-semibold text-xl">Verification Successful!</p>
+                            <p className="text-gray-400 text-sm mt-2">You are now a verified creator.</p>
+                        </>
+                    )}
+                    {status === 'failed' && (
+                        <>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-red-500 mx-auto mb-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-red-400 font-semibold text-xl">Verification Failed</p>
+                            <p className="text-gray-400 text-sm mt-2">Please try again later.</p>
+                        </>
+                    )}
+                </div>
+                <button
+                    onClick={onClose}
+                    className="mt-8 px-6 py-3 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors"
+                >
+                    Back to Profile
+                </button>
+            </div>
+        </div>
+    );
+};
+
 
 interface EditProfileModalProps {
     profile: Profile;
     onClose: () => void;
     onSave: (updatedProfile: Partial<Profile>) => void;
     isCreator: boolean;
+    db: any;
+    user: User | null;
 }
 
-const EditProfileModal = ({ profile, onClose, onSave, isCreator }: EditProfileModalProps) => {
+const EditProfileModal = ({ profile, onClose, onSave, isCreator, db, user }: EditProfileModalProps) => {
     const [displayName, setDisplayName] = useState(profile.displayName);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [bio, setBio] = useState(profile.bio || '');
@@ -718,8 +781,8 @@ const EditProfileModal = ({ profile, onClose, onSave, isCreator }: EditProfileMo
         );
     };
 
-    const handleFileChange = (e: { target: { files: any[]; }; }) => {
-        const file = e.target.files[0];
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
         if (file) {
             setSelectedFile(file);
         }
@@ -833,7 +896,7 @@ const EditProfileModal = ({ profile, onClose, onSave, isCreator }: EditProfileMo
     );
 };
 
-const ProfilePage = ({ userProfile, onClose, db }: { userProfile: Profile; onClose: () => void; db: any }) => {
+const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorStatus }: { userProfile: Profile; onClose: () => void; db: any; onVerifyKYC: () => void; onToggleCreatorStatus: () => void }) => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [profile, setProfile] = useState(userProfile);
 
@@ -873,7 +936,37 @@ const ProfilePage = ({ userProfile, onClose, db }: { userProfile: Profile; onClo
                         Edit Profile
                     </button>
                 </div>
-
+                
+                {!profile.isCreator && (
+                    <div className="flex justify-between items-center bg-gray-800 p-4 rounded-lg">
+                        <div>
+                            <h3 className="text-lg font-bold">Become a Creator</h3>
+                            <p className="text-sm text-gray-400">Unlock features like live streaming and exclusive content.</p>
+                        </div>
+                        <button
+                            onClick={onToggleCreatorStatus}
+                            className="px-4 py-2 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors font-bold"
+                        >
+                            Start Now
+                        </button>
+                    </div>
+                )}
+                
+                {profile.isCreator && (
+                    <div className="flex justify-between items-center bg-gray-800 p-4 rounded-lg">
+                        <div>
+                            <h3 className="text-lg font-bold">KYC Verification</h3>
+                            <p className="text-sm text-gray-400">Verify your identity to unlock creator features.</p>
+                        </div>
+                        <button
+                            onClick={onVerifyKYC}
+                            className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 transition-colors"
+                        >
+                            Verify Yourself
+                        </button>
+                    </div>
+                )}
+                
                 <div>
                     <h3 className="text-lg font-bold mb-2">About Me</h3>
                     <p className="text-gray-300">{profile.bio || 'No bio set yet.'}</p>
@@ -896,21 +989,50 @@ const ProfilePage = ({ userProfile, onClose, db }: { userProfile: Profile; onClo
                     </div>
                 )}
             </div>
-
             {isEditModalOpen && (
                 <EditProfileModal
                     profile={profile}
                     onClose={() => setIsEditModalOpen(false)}
                     onSave={handleSave}
                     isCreator={profile.isCreator}
+                    db={db}
+                    user={null}
                 />
             )}
         </div>
     );
 };
 
+// Custom component to explain why KYC can't work in this app
+const KYCWarningModal = ({ onClose }: { onClose: () => void }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-[101] p-4">
+            <div className="bg-gray-900 rounded-lg p-8 w-full max-w-md mx-4 text-white text-center shadow-lg border border-pink-600">
+                <div className="flex justify-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-16 h-16 text-yellow-400">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.731 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.007H12v-.007z" />
+                    </svg>
+                </div>
+                <h2 className="text-2xl font-bold mb-4">Verification Not Possible</h2>
+                <p className="mb-4 text-gray-300">
+                    A real KYC process requires a secure server to handle sensitive data and API requests. For your security, this feature is not available in this client-side application.
+                </p>
+                <p className="mb-6 text-gray-300">
+                    In a production environment, this would redirect you to a secure page to complete the verification.
+                </p>
+                <button
+                    onClick={onClose}
+                    className="px-6 py-3 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors font-bold"
+                >
+                    Understood
+                </button>
+            </div>
+        </div>
+    );
+};
 
-const DisclaimerModal = ({ onConfirm, onExit }) => {
+
+const DisclaimerModal = ({ onConfirm, onExit }: { onConfirm: () => void; onExit: () => void }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-[100]">
             <div className="bg-gray-900 rounded-lg p-8 w-full max-w-md mx-4 text-white text-center shadow-lg border border-pink-600">
@@ -950,7 +1072,7 @@ const Preloader = () => (
     </div>
 );
 
-const LoginModal = ({ onClose, auth, onLogin }) => {
+const LoginModal = ({ onClose, auth, onLogin }: { onClose: () => void; auth: any; onLogin: (isCreator: boolean) => void }) => {
     const [activeForm, setActiveForm] = useState('login-choice');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -1014,7 +1136,7 @@ const LoginModal = ({ onClose, auth, onLogin }) => {
                     displayName: userCredential.user.displayName || 'Anonymous',
                     email: userCredential.user.email || '',
                     photoURL: userCredential.user.photoURL || 'https://placehold.co/100x100',
-                    isCreator: false, // Default to user for new signups
+                    isCreator: false,
                     bio: '',
                     categories: [],
                     isProfileComplete: false
@@ -1155,7 +1277,6 @@ const LoginModal = ({ onClose, auth, onLogin }) => {
     );
 };
 
-
 const firebaseConfig = {
     apiKey: "AIzaSyCQtWBB_PL4Gi8P5Td0RCgKc7tUQLzsATg",
     authDomain: "naughtyden-app.firebaseapp.com",
@@ -1170,14 +1291,16 @@ const App = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isLoginModalOpen, setIsLoginModal] = useState(false);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-    const [user, setUser] = useState(null);
+    const [user, setUser] = useState<User | null>(null);
     const [userProfile, setUserProfile] = useState<Profile | null>(null);
-    const [selectedCreator, setSelectedCreator] = useState(null);
+    const [selectedCreator, setSelectedCreator] = useState<Creator | null>(null);
     const [selectedPage, setSelectedPage] = useState('home');
-    const [auth, setAuth] = useState(null);
-    const [db, setDb] = useState(null);
+    const [auth, setAuth] = useState<any>(null);
+    const [db, setDb] = useState<any>(null);
     const [creators, setCreators] = useState(initialCreators);
     const [isAgeConfirmed, setIsAgeConfirmed] = useState(false);
+    const [isVerifyingKYC, setIsVerifyingKYC] = useState(false);
+    const [isKYCWarningModalOpen, setIsKYCWarningModalOpen] = useState(false);
 
     useEffect(() => {
         const firebaseApp = initializeApp(firebaseConfig);
@@ -1188,7 +1311,7 @@ const App = () => {
 
         const checkAuth = async () => {
             try {
-                const initialAuthToken = window.__initial_auth_token;
+                const initialAuthToken = (window as any).__initial_auth_token;
                 if (initialAuthToken) {
                     await signInWithCustomToken(authInstance, initialAuthToken);
                 } else {
@@ -1206,7 +1329,7 @@ const App = () => {
                 setIsLoginModal(false);
                 const profileRef = doc(dbInstance, "profiles", currentUser.uid);
                 const profileDoc = await getDoc(profileRef);
-                const profileData = profileDoc.exists() ? profileDoc.data() : null;
+                const profileData = profileDoc.exists() ? profileDoc.data() as Profile : null;
 
                 if (profileData) {
                     setUserProfile(profileData);
@@ -1214,7 +1337,20 @@ const App = () => {
                         setIsProfileModalOpen(true);
                     }
                 } else {
-                    setUserProfile(null);
+                    // Create a new default profile if one doesn't exist
+                    const newProfile: Profile = {
+                        uid: currentUser.uid,
+                        displayName: currentUser.displayName || 'Anonymous',
+                        email: currentUser.email || '',
+                        photoURL: currentUser.photoURL || 'https://placehold.co/100x100',
+                        isCreator: false,
+                        bio: '',
+                        categories: [],
+                        isProfileComplete: false,
+                    };
+                    await setDoc(profileRef, newProfile);
+                    setUserProfile(newProfile);
+                    setIsProfileModalOpen(true);
                 }
             } else {
                 setUserProfile(null);
@@ -1253,7 +1389,7 @@ const App = () => {
         }
     };
 
-    const handleLike = (id) => {
+    const handleLike = (id: number) => {
         setCreators(prevCreators =>
             prevCreators.map(creator =>
                 creator.id === id ? { ...creator, likes: creator.likes + 1 } : creator
@@ -1261,12 +1397,12 @@ const App = () => {
         );
     };
 
-    const handleProfileSave = async (updatedProfile) => {
+    const handleProfileSave = async (updatedProfile: Partial<Profile>) => {
         if (db && user?.uid) {
             const profileRef = doc(db, "profiles", user.uid);
             try {
                 await updateDoc(profileRef, updatedProfile);
-                setUserProfile(prevProfile => ({ ...prevProfile, ...updatedProfile }));
+                setUserProfile(prevProfile => ({ ...prevProfile!, ...updatedProfile as Profile }));
                 console.log("Profile updated successfully!");
                 setIsProfileModalOpen(false);
             } catch (error) {
@@ -1275,6 +1411,19 @@ const App = () => {
         }
     };
 
+    const handleToggleCreatorStatus = async () => {
+        if (db && userProfile?.uid) {
+            const profileRef = doc(db, "profiles", userProfile.uid);
+            try {
+                await updateDoc(profileRef, { isCreator: true, isProfileComplete: false });
+                setUserProfile(prevProfile => ({ ...prevProfile!, isCreator: true, isProfileComplete: false }));
+                setIsProfileModalOpen(true);
+                console.log("Profile updated to Creator successfully!");
+            } catch (error) {
+                console.error("Failed to update profile status:", error);
+            }
+        }
+    };
 
     if (isLoading) {
         return <Preloader />;
@@ -1284,12 +1433,20 @@ const App = () => {
         return <DisclaimerModal onConfirm={handleAgeConfirm} onExit={handleAgeExit} />;
     }
 
+    if (isKYCWarningModalOpen) {
+        return <KYCWarningModal onClose={() => setIsKYCWarningModalOpen(false)} />;
+    }
+
+    if (isVerifyingKYC) {
+        return <VerifyKYCPage onClose={() => setIsVerifyingKYC(false)} />;
+    }
+
     if (selectedPage === 'live-posts') {
         return <LivePosts onClose={() => setSelectedPage('home')} user={user} />;
     }
 
     if (selectedPage === 'my-profile' && userProfile) {
-        return <ProfilePage userProfile={userProfile} onClose={() => setSelectedPage('home')} db={db} />;
+        return <ProfilePage userProfile={userProfile} onClose={() => setSelectedPage('home')} db={db} onVerifyKYC={() => setIsKYCWarningModalOpen(true)} onToggleCreatorStatus={handleToggleCreatorStatus} />;
     }
 
     if (selectedCreator) {
@@ -1298,45 +1455,7 @@ const App = () => {
 
     return (
         <div className="bg-gray-950 text-white min-h-screen font-sans">
-            <style dangerouslySetInnerHTML={{ __html: `
-                @font-face {
-                    font-family: 'Geist';
-                    src: url('https://cdn.jsdelivr.net/npm/@geist-ui/fonts/geist/geist-bold.woff2') format('woff2');
-                    font-weight: 400;
-                    font-style: normal;
-                }
-                @font-face {
-                    font-family: 'Geist';
-                    src: url('https://cdn.jsdelivr.net/npm/@geist-ui/fonts/geist/geist-bold.woff2') format('woff2');
-                    font-weight: 700;
-                    font-style: normal;
-                }
-                body {
-                    font-family: 'Geist', sans-serif;
-                    font-weight: 700;
-                }
-                .logo-glow {
-                    box-shadow: 0 0 5px #ec4899, 0 0 20px #ec4899;
-                    filter: brightness(1.2);
-                }
-                @keyframes pulse-glow {
-                    0% {
-                        transform: scale(1);
-                        filter: drop-shadow(0 0 0 rgba(236, 72, 153, 0.7));
-                    }
-                    50% {
-                        transform: scale(1.1);
-                        filter: drop-shadow(0 0 8px rgba(236, 72, 153, 1));
-                    }
-                    100% {
-                        transform: scale(1);
-                        filter: drop-shadow(0 0 0 rgba(236, 72, 153, 0));
-                    }
-                }
-                .animate-pulse-glow {
-                    animation: pulse-glow 0.6s ease-in-out;
-                }
-            ` }} />
+            <AppCSS />
             {/* Header */}
             <header className="relative z-50 py-4 px-6 md:px-12 flex justify-between items-center">
                 <div className="h-10 w-auto">
@@ -1469,6 +1588,8 @@ const App = () => {
                     onClose={() => setIsProfileModalOpen(false)}
                     onSave={handleProfileSave}
                     isCreator={userProfile.isCreator}
+                    db={db}
+                    user={user}
                 />
             )}
         </div>
