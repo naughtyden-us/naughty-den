@@ -6,70 +6,8 @@ import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, User, crea
 import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Tailwind CSS
-const AppCSS = () => (
-    <style dangerouslySetInnerHTML={{
-        __html: `
-            @import "tailwindcss";
-
-            :root {
-                --background: #ffffff;
-                --foreground: #171717;
-            }
-
-            @media (prefers-color-scheme: dark) {
-                :root {
-                    --background: #0a0a0a;
-                    --foreground: #ededed;
-                }
-            }
-
-            body {
-                background: var(--background);
-                color: var(--foreground);
-                font-family: Arial, Helvetica, sans-serif;
-            }
-
-            @font-face {
-                font-family: 'Geist';
-                src: url('https://cdn.jsdelivr.net/npm/@geist-ui/fonts/geist/geist-bold.woff2') format('woff2');
-                font-weight: 400;
-                font-style: normal;
-            }
-            @font-face {
-                font-family: 'Geist';
-                src: url('https://cdn.jsdelivr.net/npm/@geist-ui/fonts/geist/geist-bold.woff2') format('woff2');
-                font-weight: 700;
-                font-style: normal;
-            }
-            body {
-                font-family: 'Geist', sans-serif;
-                font-weight: 700;
-            }
-            .logo-glow {
-                box-shadow: 0 0 5px #ec4899, 0 0 20px #ec4899;
-                filter: brightness(1.2);
-            }
-            @keyframes pulse-glow {
-                0% {
-                    transform: scale(1);
-                    filter: drop-shadow(0 0 0 rgba(236, 72, 153, 0.7));
-                }
-                50% {
-                    transform: scale(1.1);
-                    filter: drop-shadow(0 0 8px rgba(236, 72, 153, 1));
-                }
-                100% {
-                    transform: scale(1);
-                    filter: drop-shadow(0 0 0 rgba(236, 72, 153, 0));
-                }
-            }
-            .animate-pulse-glow {
-                animation: pulse-glow 0.6s ease-in-out;
-            }
-        `
-    }} />
-);
+// Remove inlined Tailwind CSS import and custom font injection
+const AppCSS = () => null;
 
 // Type definitions
 interface Creator {
@@ -746,6 +684,7 @@ const EditProfileModal = ({ profile, onClose, onSave, isCreator, db, user }: Edi
     const [bio, setBio] = useState(profile.bio || '');
     const [categories, setCategories] = useState(profile.categories || []);
     const [uploading, setUploading] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     const allCategories = [
         'Popular / Trending',
@@ -790,22 +729,29 @@ const EditProfileModal = ({ profile, onClose, onSave, isCreator, db, user }: Edi
 
     const handleSave = async () => {
         setUploading(true);
-        let photoURL = profile.photoURL;
-        if (selectedFile) {
-            try {
-                const storage = getStorage();
-                const storageRef = ref(storage, `profiles/${profile.uid}/${selectedFile.name}`);
-                await uploadBytes(storageRef, selectedFile);
-                photoURL = await getDownloadURL(storageRef);
-            } catch (error) {
-                console.error("Error uploading file:", error);
-                setUploading(false);
-                return;
+        setSaveError(null);
+        try {
+            let photoURL = profile.photoURL;
+            if (selectedFile) {
+                try {
+                    const storage = getStorage();
+                    const storageRef = ref(storage, `profiles/${profile.uid}/${selectedFile.name}`);
+                    await uploadBytes(storageRef, selectedFile);
+                    photoURL = await getDownloadURL(storageRef);
+                } catch (error) {
+                    console.error("Error uploading file:", error);
+                    setSaveError("Upload failed. Please try a smaller image or check your connection.");
+                    return;
+                }
             }
+            await onSave({ displayName, photoURL, bio, categories, isProfileComplete: true });
+            onClose();
+        } catch (error) {
+            console.error("Failed to save profile:", error);
+            setSaveError("Saving failed. Please try again.");
+        } finally {
+            setUploading(false);
         }
-
-        onSave({ displayName, photoURL, bio, categories, isProfileComplete: true });
-        setUploading(false);
     };
 
     return (
@@ -857,7 +803,7 @@ const EditProfileModal = ({ profile, onClose, onSave, isCreator, db, user }: Edi
 
                     {isCreator && (
                         <div>
-                            <h3 className="text-lg font-bold mb-2">Content Categories</h3>
+                            <h3 className="text-lg font-bold mb-2">Interests</h3>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
                                 {allCategories.map(category => (
                                     <label key={category} className="flex items-center space-x-2">
@@ -882,6 +828,7 @@ const EditProfileModal = ({ profile, onClose, onSave, isCreator, db, user }: Edi
                         >
                             Cancel
                         </button>
+                        {saveError && <p className="text-red-400 text-sm text-right">{saveError}</p>}
                         <button
                             onClick={handleSave}
                             className="px-4 py-2 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed"
@@ -900,13 +847,14 @@ const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorSta
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [profile, setProfile] = useState(userProfile);
 
-    const handleSave = async (updatedProfile: Profile) => {
+    const handleSave = async (updatedProfile: Partial<Profile>) => {
         if (db && profile.uid) {
             const profileRef = doc(db, "profiles", profile.uid);
             try {
-                await updateDoc(profileRef, updatedProfile);
+                await updateDoc(profileRef, updatedProfile as any);
                 setProfile(prevProfile => ({ ...prevProfile, ...updatedProfile }));
                 console.log("Profile updated successfully!");
+                setIsEditModalOpen(false);
             } catch (error) {
                 console.error("Failed to update profile:", error);
             }
@@ -919,33 +867,33 @@ const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorSta
                 Back
             </button>
 
-            <div className="max-w-3xl mx-auto bg-gray-900 rounded-xl p-6 shadow-lg space-y-6">
+            <div className={`max-w-3xl mx-auto rounded-xl p-6 shadow-lg space-y-6 ${profile.isCreator ? 'bg-gray-900' : 'bg-gray-800'}`}>
                 <div className="flex items-center justify-between border-b border-gray-800 pb-4">
                     <div className="flex items-center space-x-4">
-                        <img src={profile.photoURL} alt="Profile" className="w-24 h-24 rounded-full object-cover border-4 border-pink-600" />
+                        <img src={profile.photoURL} alt="Profile" className={`w-24 h-24 rounded-full object-cover border-4 ${profile.isCreator ? 'border-pink-600' : 'border-purple-600'}`} />
                         <div>
-                            <h2 className="text-3xl font-bold">{profile.displayName}</h2>
+                            <h2 className={`text-3xl font-bold ${profile.isCreator ? 'text-white' : 'text-gray-100'}`}>{profile.displayName}</h2>
                             <p className="text-gray-400">@{profile.displayName.toLowerCase().replace(' ', '_')}</p>
-                            <p className="text-sm text-green-400 mt-1">{profile.isCreator ? 'Creator' : 'User'}</p>
+                            <p className={`text-sm mt-1 ${profile.isCreator ? 'text-green-400' : 'text-blue-400'}`}>{profile.isCreator ? 'Creator' : 'User'}</p>
                         </div>
                     </div>
                     <button
                         onClick={() => setIsEditModalOpen(true)}
-                        className="px-4 py-2 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors"
+                        className={`px-4 py-2 rounded-lg transition-colors ${profile.isCreator ? 'border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white' : 'border-purple-600 text-purple-300 hover:bg-purple-600 hover:text-white'}`}
                     >
                         Edit Profile
                     </button>
                 </div>
                 
                 {!profile.isCreator && (
-                    <div className="flex justify-between items-center bg-gray-800 p-4 rounded-lg">
+                    <div className="flex justify-between items-center bg-gray-700 p-4 rounded-lg">
                         <div>
                             <h3 className="text-lg font-bold">Become a Creator</h3>
                             <p className="text-sm text-gray-400">Unlock features like live streaming and exclusive content.</p>
                         </div>
                         <button
                             onClick={onToggleCreatorStatus}
-                            className="px-4 py-2 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors font-bold"
+                            className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors font-bold"
                         >
                             Start Now
                         </button>
@@ -953,7 +901,7 @@ const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorSta
                 )}
                 
                 {profile.isCreator && (
-                    <div className="flex justify-between items-center bg-gray-800 p-4 rounded-lg">
+                    <div className="flex justify-between items-center bg-gray-900 p-4 rounded-lg">
                         <div>
                             <h3 className="text-lg font-bold">KYC Verification</h3>
                             <p className="text-sm text-gray-400">Verify your identity to unlock creator features.</p>
@@ -974,7 +922,7 @@ const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorSta
 
                 {profile.isCreator && (
                     <div>
-                        <h3 className="text-lg font-bold mb-2">My Content Categories</h3>
+                        <h3 className="text-lg font-bold mb-2">My Interests</h3>
                         <div className="flex flex-wrap gap-2">
                             {(profile.categories ?? []).length > 0 ? (
                                 (profile.categories ?? []).map(category => (
@@ -993,7 +941,7 @@ const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorSta
                 <EditProfileModal
                     profile={profile}
                     onClose={() => setIsEditModalOpen(false)}
-                    onSave={handleSave}
+                    onSave={(updatedProfile: Partial<Profile>) => handleSave(updatedProfile)}
                     isCreator={profile.isCreator}
                     db={db}
                     user={null}
@@ -1082,7 +1030,7 @@ const LoginModal = ({ onClose, auth, onLogin }: { onClose: () => void; auth: any
 
     const db = getFirestore();
 
-    const handleLogin = async (e) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         try {
@@ -1093,12 +1041,12 @@ const LoginModal = ({ onClose, auth, onLogin }: { onClose: () => void; auth: any
                 onLogin(profileData.isCreator);
             }
             onClose();
-        } catch (err) {
+        } catch (err: any) {
             setError(err.message);
         }
     };
 
-    const handleSignUp = async (e) => {
+    const handleSignUp = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         try {
@@ -1117,7 +1065,7 @@ const LoginModal = ({ onClose, auth, onLogin }: { onClose: () => void; auth: any
             await setDoc(doc(db, "profiles", userCredential.user.uid), profileData);
             onLogin(isCreator);
             onClose();
-        } catch (err) {
+        } catch (err: any) {
             setError(err.message);
         }
     };
@@ -1147,7 +1095,7 @@ const LoginModal = ({ onClose, auth, onLogin }: { onClose: () => void; auth: any
                 onLogin(profileDoc.data()?.isCreator || false);
             }
             onClose();
-        } catch (err) {
+        } catch (err: any) {
             setError(err.message);
         }
     };
@@ -1281,7 +1229,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyCQtWBB_PL4Gi8P5Td0RCgKc7tUQLzsATg",
     authDomain: "naughtyden-app.firebaseapp.com",
     projectId: "naughtyden-app",
-    storageBucket: "naughtyden-app.firebasestorage.app",
+    storageBucket: "naughtyden-app.appspot.com",
     messagingSenderId: "1038096287210",
     appId: "1:1038096287210:web:e2f569629036cd00125e93",
     measurementId: "G-RYREQGMGB1"
@@ -1481,6 +1429,9 @@ const App = () => {
                                 <span className="text-white">Hi, {userProfile?.displayName || user.displayName || 'User'}</span>
                                 {userProfile?.isProfileComplete && <span className="text-green-500 text-lg">✅</span>}
                             </div>
+                            <button onClick={() => setSelectedPage('my-profile')} className="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors hidden md:block">
+                                View My Profile
+                            </button>
                             <button onClick={handleLogout} className="px-4 py-2 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
                                 Logout
                             </button>
@@ -1581,7 +1532,7 @@ const App = () => {
                     &copy; 2025 Naughty Den. All rights reserved.
                 </div>
             </footer>
-            {isLoginModalOpen && <LoginModal auth={auth} onClose={() => setIsLoginModal(false)} onLogin={() => {}} />}
+            {isLoginModalOpen && <LoginModal auth={auth} onClose={() => setIsLoginModal(false)} onLogin={() => setSelectedPage('my-profile')} />}
             {isProfileModalOpen && userProfile && (
                 <EditProfileModal
                     profile={userProfile}
