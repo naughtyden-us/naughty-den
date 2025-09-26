@@ -1,4 +1,7 @@
+import { ReactNode } from "react";
+
 export interface Creator {
+  likes: ReactNode;
   id: number;
   name: string;
   rating: number;
