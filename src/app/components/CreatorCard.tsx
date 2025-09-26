@@ -3,6 +3,7 @@
 import React from 'react';
 import { Creator } from './types';
 
+
 interface CreatorCardProps {
   creator: Creator;
   onViewProfile: (creator: Creator) => void;
