@@ -5,6 +5,8 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, User, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signInAnonymously, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import VeriffKYC from './components/VeriffKYC';
+import InlineVeriffKYC from './components/InlineVeriffKYC';
 
 // Remove inlined Tailwind CSS import and custom font injection
 const AppCSS = () => null;
@@ -19,6 +21,8 @@ interface Creator {
     isAd: boolean;
     image: string;
     type: string;
+    isVerified?: boolean;
+    verificationStatus?: 'pending' | 'verified' | 'failed';
 }
 
 interface Profile {
@@ -30,6 +34,8 @@ interface Profile {
     bio?: string;
     categories?: string[];
     isProfileComplete: boolean;
+    isVerified?: boolean;
+    verificationStatus?: 'pending' | 'verified' | 'failed';
 }
 
 interface Post {
@@ -88,6 +94,8 @@ const initialCreators: Creator[] = [
         image: 'https://images.unsplash.com/photo-1630280717628-7d0d071cf2e3?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         type: 'Subscription',
         likes: 124,
+        isVerified: true,
+        verificationStatus: 'verified',
     },
     {
         id: 2,
@@ -98,6 +106,8 @@ const initialCreators: Creator[] = [
         image: 'https://images.unsplash.com/photo-1630520707335-9e4e79b731c3?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         type: 'Subscription',
         likes: 210,
+        isVerified: true,
+        verificationStatus: 'verified',
     },
     {
         id: 3,
@@ -108,6 +118,8 @@ const initialCreators: Creator[] = [
         image: 'https://images.unsplash.com/photo-1550428083-7019ebe39b45?q=80&w=1102&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         type: 'Subscription',
         likes: 315,
+        isVerified: false,
+        verificationStatus: 'pending',
     },
     {
         id: 4,
@@ -118,6 +130,8 @@ const initialCreators: Creator[] = [
         image: 'https://images.unsplash.com/photo-1728463087178-a8c804a5eec2?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         type: 'Subscription',
         likes: 98,
+        isVerified: true,
+        verificationStatus: 'verified',
     },
     {
         id: 5,
@@ -128,6 +142,8 @@ const initialCreators: Creator[] = [
         image: 'https://images.unsplash.com/photo-1673379421016-b84b1dc410ca?q=80&w=1092&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         type: 'Subscription',
         likes: 156,
+        isVerified: false,
+        verificationStatus: 'failed',
     },
     {
         id: 6,
@@ -138,6 +154,8 @@ const initialCreators: Creator[] = [
         image: 'https://images.unsplash.com/photo-1584996433468-6e702c8fc9d9?q=80&w=1160&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         type: 'Subscription',
         likes: 421,
+        isVerified: true,
+        verificationStatus: 'verified',
     },
     {
         id: 7,
@@ -148,6 +166,8 @@ const initialCreators: Creator[] = [
         image: 'https://images.unsplash.com/photo-1676328012648-ee16da2e08d8?q=80&w=1233&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         type: 'Subscription',
         likes: 85,
+        isVerified: false,
+        verificationStatus: 'pending',
     },
     {
         id: 8,
@@ -158,6 +178,8 @@ const initialCreators: Creator[] = [
         image: 'https://images.unsplash.com/photo-1676328012648-ee16da2e08d8?q=80&w=1233&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         type: 'Subscription',
         likes: 150,
+        isVerified: true,
+        verificationStatus: 'verified',
     },
 ];
 
@@ -181,6 +203,20 @@ const CreatorCard: React.FC<{ creator: Creator; onViewProfile: (creator: Creator
             <div className="absolute top-2 right-2 flex space-x-2">
                 {creator.isAd && (
                     <span className="text-xs font-semibold bg-pink-600 text-white px-2 py-1 rounded-full uppercase">Ad</span>
+                )}
+                {creator.isVerified && (
+                    <span className="text-xs font-semibold bg-green-600 text-white px-2 py-1 rounded-full uppercase flex items-center space-x-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-3 h-3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Verified</span>
+                    </span>
+                )}
+                {creator.verificationStatus === 'pending' && (
+                    <span className="text-xs font-semibold bg-yellow-600 text-white px-2 py-1 rounded-full uppercase">Pending</span>
+                )}
+                {creator.verificationStatus === 'failed' && (
+                    <span className="text-xs font-semibold bg-red-600 text-white px-2 py-1 rounded-full uppercase">Unverified</span>
                 )}
             </div>
             <div className="p-4 bg-gray-900 text-white">
@@ -843,7 +879,7 @@ const EditProfileModal = ({ profile, onClose, onSave, isCreator, db, user }: Edi
     );
 };
 
-const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorStatus }: { userProfile: Profile; onClose: () => void; db: any; onVerifyKYC: () => void; onToggleCreatorStatus: () => void }) => {
+const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorStatus, isInlineVerificationOpen, onInlineVerificationClose, onVerificationComplete }: { userProfile: Profile; onClose: () => void; db: any; onVerifyKYC: () => void; onToggleCreatorStatus: () => void; isInlineVerificationOpen: boolean; onInlineVerificationClose: () => void; onVerificationComplete: (status: 'success' | 'failed' | 'pending') => void }) => {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [profile, setProfile] = useState(userProfile);
 
@@ -901,17 +937,56 @@ const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorSta
                 )}
                 
                 {profile.isCreator && (
-                    <div className="flex justify-between items-center bg-gray-900 p-4 rounded-lg">
-                        <div>
-                            <h3 className="text-lg font-bold">KYC Verification</h3>
-                            <p className="text-sm text-gray-400">Verify your identity to unlock creator features.</p>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center bg-gray-900 p-4 rounded-lg">
+                            <div>
+                                <h3 className="text-lg font-bold">KYC Verification</h3>
+                                <p className="text-sm text-gray-400">
+                                    {profile.isVerified 
+                                        ? 'Your identity has been verified. You can now access all creator features.'
+                                        : profile.verificationStatus === 'pending'
+                                        ? 'Your verification is currently being reviewed. Please wait for approval.'
+                                        : profile.verificationStatus === 'failed'
+                                        ? 'Verification failed. Please try again with valid documents.'
+                                        : 'Verify your identity to unlock creator features.'
+                                    }
+                                </p>
+                                {profile.isVerified && (
+                                    <div className="flex items-center space-x-2 mt-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-green-400">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <span className="text-green-400 text-sm font-semibold">Verified Creator</span>
+                                    </div>
+                                )}
+                            </div>
+                            {!profile.isVerified && !isInlineVerificationOpen && (
+                                <button
+                                    onClick={onVerifyKYC}
+                                    className={`px-4 py-2 rounded-lg transition-colors ${
+                                        profile.verificationStatus === 'pending'
+                                            ? 'bg-yellow-600 hover:bg-yellow-700'
+                                            : profile.verificationStatus === 'failed'
+                                            ? 'bg-red-600 hover:bg-red-700'
+                                            : 'bg-green-600 hover:bg-green-700'
+                                    }`}
+                                >
+                                    {profile.verificationStatus === 'pending' 
+                                        ? 'Verification Pending'
+                                        : profile.verificationStatus === 'failed'
+                                        ? 'Retry Verification'
+                                        : 'Verify Yourself'
+                                    }
+                                </button>
+                            )}
                         </div>
-                        <button
-                            onClick={onVerifyKYC}
-                            className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 transition-colors"
-                        >
-                            Verify Yourself
-                        </button>
+                        
+                        {isInlineVerificationOpen && (
+                            <InlineVeriffKYC 
+                                onVerificationComplete={onVerificationComplete}
+                                onClose={onInlineVerificationClose}
+                            />
+                        )}
                     </div>
                 )}
                 
@@ -952,6 +1027,30 @@ const ProfilePage = ({ userProfile, onClose, db, onVerifyKYC, onToggleCreatorSta
 };
 
 // Custom component to explain why KYC can't work in this app
+const CreatorsPage = ({ creators, onViewProfile, onLike, onClose }: { creators: Creator[]; onViewProfile: (creator: Creator) => void; onLike: (creatorId: number) => void; onClose: () => void }) => {
+    return (
+        <div className="bg-gray-950 text-white min-h-screen font-sans">
+            <div className="p-6 md:p-12">
+                <div className="flex justify-between items-center mb-6 md:mb-12 relative">
+                    <button onClick={onClose} className="py-2 px-4 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
+                        Back
+                    </button>
+                    <div className="flex flex-col items-center absolute left-1/2 transform -translate-x-1/2">
+                        <img src="/logo.png" alt="Naughty Den Logo" width={80} height={32} className="w-auto h-8 md:h-10" />
+                        <h1 className="text-3xl font-bold mt-2 text-pink-600">All Creators</h1>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                    {creators.map((creator) => (
+                        <CreatorCard key={creator.id} creator={creator} onViewProfile={onViewProfile} onLike={onLike} />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const KYCWarningModal = ({ onClose }: { onClose: () => void }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-[101] p-4">
@@ -1249,6 +1348,9 @@ const App = () => {
     const [isAgeConfirmed, setIsAgeConfirmed] = useState(false);
     const [isVerifyingKYC, setIsVerifyingKYC] = useState(false);
     const [isKYCWarningModalOpen, setIsKYCWarningModalOpen] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isVeriffKYCModalOpen, setIsVeriffKYCModalOpen] = useState(false);
+    const [isInlineVerificationOpen, setIsInlineVerificationOpen] = useState(false);
 
     useEffect(() => {
         const firebaseApp = initializeApp(firebaseConfig);
@@ -1373,6 +1475,29 @@ const App = () => {
         }
     };
 
+    const handleVeriffKYC = () => {
+        setIsInlineVerificationOpen(true);
+    };
+
+    const handleVerificationComplete = async (status: 'success' | 'failed' | 'pending') => {
+        if (db && userProfile?.uid) {
+            const profileRef = doc(db, "profiles", userProfile.uid);
+            try {
+                const updateData: any = { verificationStatus: status };
+                if (status === 'success') {
+                    updateData.isVerified = true;
+                }
+                await updateDoc(profileRef, updateData);
+                setUserProfile(prevProfile => ({ ...prevProfile!, ...updateData }));
+                console.log("Verification status updated successfully!");
+            } catch (error) {
+                console.error("Failed to update verification status:", error);
+            }
+        }
+        setIsVeriffKYCModalOpen(false);
+        setIsInlineVerificationOpen(false);
+    };
+
     if (isLoading) {
         return <Preloader />;
     }
@@ -1394,11 +1519,24 @@ const App = () => {
     }
 
     if (selectedPage === 'my-profile' && userProfile) {
-        return <ProfilePage userProfile={userProfile} onClose={() => setSelectedPage('home')} db={db} onVerifyKYC={() => setIsKYCWarningModalOpen(true)} onToggleCreatorStatus={handleToggleCreatorStatus} />;
+        return <ProfilePage 
+            userProfile={userProfile} 
+            onClose={() => setSelectedPage('home')} 
+            db={db} 
+            onVerifyKYC={handleVeriffKYC} 
+            onToggleCreatorStatus={handleToggleCreatorStatus}
+            isInlineVerificationOpen={isInlineVerificationOpen}
+            onInlineVerificationClose={() => setIsInlineVerificationOpen(false)}
+            onVerificationComplete={handleVerificationComplete}
+        />;
     }
 
     if (selectedCreator) {
         return <CreatorProfile creator={selectedCreator} onClose={() => setSelectedCreator(null)} />;
+    }
+
+    if (selectedPage === 'creators') {
+        return <CreatorsPage creators={creators} onViewProfile={setSelectedCreator} onLike={handleLike} onClose={() => setSelectedPage('home')} />;
     }
 
     return (
@@ -1409,16 +1547,30 @@ const App = () => {
                 <div className="h-10 w-auto">
                     <img src="/logo.png" alt="Naughty Den Logo" width={100} height={40} className="h-10 w-auto" />
                 </div>
+                
+                {/* Mobile Menu Button */}
+                <button 
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="md:hidden p-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                </button>
+
+                {/* Desktop Navigation */}
                 <nav className="hidden md:flex space-x-6 text-gray-400">
                     <a href="#" onClick={() => setSelectedPage('home')} className="hover:text-white transition-colors">Home</a>
-                    <a href="#" className="hover:text-white transition-colors">Creators</a>
+                    <a href="#" onClick={() => setSelectedPage('creators')} className="hover:text-white transition-colors">Creators</a>
                     <a href="#" className="hover:text-white transition-colors">Search photos...</a>
                     <a href="#" onClick={() => setSelectedPage('live-posts')} className="hover:text-white transition-colors">Get Naughty</a>
                     <a href="#" className="hover:text-white transition-colors">Contact</a>
                 </nav>
-                <div className="flex items-center space-x-4">
+                
+                {/* Desktop User Actions */}
+                <div className="hidden md:flex items-center space-x-4">
                     {user && userProfile?.isCreator && (
-                        <a href="#" className="hidden md:block text-gray-400 hover:text-white transition-colors">Creator dashboard</a>
+                        <a href="#" className="text-gray-400 hover:text-white transition-colors">Creator dashboard</a>
                     )}
                     {user ? (
                         <>
@@ -1429,7 +1581,7 @@ const App = () => {
                                 <span className="text-white">Hi, {userProfile?.displayName || user.displayName || 'User'}</span>
                                 {userProfile?.isProfileComplete && <span className="text-green-500 text-lg">✅</span>}
                             </div>
-                            <button onClick={() => setSelectedPage('my-profile')} className="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors hidden md:block">
+                            <button onClick={() => setSelectedPage('my-profile')} className="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors">
                                 View My Profile
                             </button>
                             <button onClick={handleLogout} className="px-4 py-2 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
@@ -1448,6 +1600,64 @@ const App = () => {
                     )}
                 </div>
             </header>
+
+            {/* Mobile Menu */}
+            {isMobileMenuOpen && (
+                <div className="md:hidden fixed inset-0 z-50 bg-gray-950">
+                    <div className="p-6">
+                        <div className="flex justify-between items-center mb-8">
+                            <img src="/logo.png" alt="Naughty Den Logo" width={80} height={32} className="h-8 w-auto" />
+                            <button 
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className="p-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <nav className="space-y-4 mb-8">
+                            <a href="#" onClick={() => { setSelectedPage('home'); setIsMobileMenuOpen(false); }} className="block py-3 text-lg text-gray-400 hover:text-white transition-colors">Home</a>
+                            <a href="#" onClick={() => { setSelectedPage('creators'); setIsMobileMenuOpen(false); }} className="block py-3 text-lg text-gray-400 hover:text-white transition-colors">Creators</a>
+                            <a href="#" className="block py-3 text-lg text-gray-400 hover:text-white transition-colors">Search photos...</a>
+                            <a href="#" onClick={() => { setSelectedPage('live-posts'); setIsMobileMenuOpen(false); }} className="block py-3 text-lg text-gray-400 hover:text-white transition-colors">Get Naughty</a>
+                            <a href="#" className="block py-3 text-lg text-gray-400 hover:text-white transition-colors">Contact</a>
+                        </nav>
+
+                        <div className="space-y-4">
+                            {user ? (
+                                <>
+                                    <div className="flex items-center space-x-3 mb-4">
+                                        {userProfile?.photoURL && (
+                                            <img src={userProfile.photoURL} alt="Profile" width={40} height={40} className="w-10 h-10 rounded-full border border-pink-600" />
+                                        )}
+                                        <div>
+                                            <p className="text-white font-semibold">{userProfile?.displayName || user.displayName || 'User'}</p>
+                                            <p className="text-gray-400 text-sm">{userProfile?.isCreator ? 'Creator' : 'User'}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => { setSelectedPage('my-profile'); setIsMobileMenuOpen(false); }} className="w-full py-3 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-800 transition-colors">
+                                        View My Profile
+                                    </button>
+                                    <button onClick={() => { handleLogout(); setIsMobileMenuOpen(false); }} className="w-full py-3 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
+                                        Logout
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button onClick={() => { setIsLoginModal(true); setIsMobileMenuOpen(false); }} className="w-full py-3 rounded-lg border border-pink-600 text-pink-600 hover:bg-pink-600 hover:text-white transition-colors">
+                                        Login
+                                    </button>
+                                    <button className="w-full py-3 rounded-lg bg-pink-600 hover:bg-pink-700 transition-colors">
+                                        Get Pro
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Hero Section */}
             <section className="relative h-[80vh] flex items-center justify-center text-center">
                 <div className="absolute inset-0">
@@ -1541,6 +1751,12 @@ const App = () => {
                     isCreator={userProfile.isCreator}
                     db={db}
                     user={user}
+                />
+            )}
+            {isVeriffKYCModalOpen && (
+                <VeriffKYC 
+                    onClose={() => setIsVeriffKYCModalOpen(false)} 
+                    onVerificationComplete={handleVerificationComplete} 
                 />
             )}
         </div>

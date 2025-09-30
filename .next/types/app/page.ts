@@ -1,4 +1,4 @@
-// File: C:\Users\mmmed\Downloads\naughty-den-0274552d8b45743db849743a33394e226ffbc713\nd\src\app\page.tsx
+// File: C:\Users\mmmed\Desktop\NAUGHTYDEN\NAUGHTYDEN\src\app\page.tsx
 import * as entry from '../../../src/app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
